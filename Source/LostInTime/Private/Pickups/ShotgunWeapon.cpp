@@ -20,7 +20,8 @@ void AShotgunWeapon::Fire()
 		const FVector EndTrace = StartTrace + ShootDir * InstantConfig.WeaponRange;
 
 		const FHitResult Impact = WeaponTrace(StartTrace, EndTrace);
-		ProcessInstantHit(Impact, StartTrace, ShootDir, RandomSeed, CurrentSpread);
+		if (Impact.GetActor())
+			ProcessInstantHit(Impact, StartTrace, ShootDir, RandomSeed, CurrentSpread);
 	}
 
 	//CurrentFiringSpread = FMath::Min(InstantConfig.FiringSpreadMax, CurrentFiringSpread + InstantConfig.FiringSpreadIncrement);
@@ -56,7 +57,12 @@ void AShotgunWeapon::ProcessInstantHit(const FHitResult& Impact, const FVector& 
 
 bool AShotgunWeapon::ShouldDealDamage(AActor* TestActor) const
 {
-	return true;
+	if (TestActor->GetClass()->IsChildOf(APawn::StaticClass()))
+	{
+		return true;
+	}
+	else
+		return false;
 }
 
 void AShotgunWeapon::ProcessInstantHit_Confirmed(const FHitResult& Impact, const FVector& Origin, const FVector& ShootDir, int32 RandomSeed, float ReticleSpread)

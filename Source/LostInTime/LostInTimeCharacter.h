@@ -68,6 +68,8 @@ public:
 
 	class USkeletalMeshComponent* GetFPMesh();
 
+	UFUNCTION(BlueprintCallable, Category = "Pickup")
+	void SetPickup(int32 PickupValue);
 
 
 protected:
@@ -95,6 +97,15 @@ protected:
 
 	template<EWeaponType EWeaponToEquip>
 	void SwapWeapon() { SwapWeapon(EWeaponToEquip); }
+
+	UPROPERTY(EditDefaultsOnly, Category = Weapon)
+	bool bHasTorch;
+	UPROPERTY(EditDefaultsOnly, Category = Weapon)
+	bool bHasRifle;
+	UPROPERTY(EditDefaultsOnly, Category = Weapon)
+	bool bHasShotgun;
+
+	void setHasTorch(bool hasTorch) { bHasTorch = hasTorch; }
 	
 protected:
 	// APawn interface

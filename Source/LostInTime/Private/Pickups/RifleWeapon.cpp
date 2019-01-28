@@ -43,7 +43,8 @@ void ARifleWeapon::Fire()
 		const FVector EndTrace = StartTrace + ShootDir * InstantConfig.WeaponRange;
 
 		const FHitResult Impact = WeaponTrace(StartTrace, EndTrace);
-		ProcessInstantHit(Impact, StartTrace, ShootDir, RandomSeed, CurrentSpread);
+		if(Impact.GetActor())
+			ProcessInstantHit(Impact, StartTrace, ShootDir, RandomSeed, CurrentSpread);
 
 		//CurrentFiringSpread = FMath::Min(InstantConfig.FiringSpreadMax, CurrentFiringSpread + InstantConfig.FiringSpreadIncrement);
 	}
@@ -103,7 +104,12 @@ void ARifleWeapon::Reload()
 
 bool ARifleWeapon::ShouldDealDamage(AActor* TestActor) const
 {
-	return true;
+	if (TestActor->GetClass()->IsChildOf(APawn::StaticClass()))
+	{
+		return true;
+	}
+	else
+		return false;
 }
 
 void ARifleWeapon::DealDamage(const FHitResult& Impact, const FVector& ShootDir)
@@ -115,6 +121,7 @@ void ARifleWeapon::DealDamage(const FHitResult& Impact, const FVector& ShootDir)
 	PointDmg.Damage = InstantConfig.HitDamage;
 
 	Impact.GetActor()->TakeDamage(PointDmg.Damage, PointDmg, MyPawn->Controller, this);
+	
 }
 
 void ARifleWeapon::NewNotifyHit(const FHitResult& Impact, FVector_NetQuantizeNormal ShootDir, int32 RandomSeed, float ReticleSpread)

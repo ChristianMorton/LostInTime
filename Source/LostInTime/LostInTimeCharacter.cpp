@@ -48,6 +48,10 @@ ALostInTimeCharacter::ALostInTimeCharacter()
 
 	AttachPoint = "GripPoint";
 
+	bHasTorch = false;
+	bHasRifle = false;
+	bHasShotgun = false;
+
 }
 
 void ALostInTimeCharacter::BeginPlay()
@@ -131,6 +135,19 @@ class USkeletalMeshComponent* ALostInTimeCharacter::GetFPMesh()
 	return Mesh1P;
 }
 
+void ALostInTimeCharacter::SetPickup(int32 PickupValue)
+{
+	switch (PickupValue)
+	{
+	case 0: 
+		bHasTorch = true;
+		SwapWeapon(EWeaponType::Torch);
+		break;
+	default:
+		break;
+	}
+}
+
 void ALostInTimeCharacter::MoveForward(float Value)
 {
 	if (Value != 0.0f)
@@ -172,7 +189,7 @@ void ALostInTimeCharacter::SwapWeapon(EWeaponType EWeaponToEquip)
 	{
 	case EWeaponType::Torch:
 
-		if (Inventory.Num() >= 1)
+		if (Inventory.Num() >= 1 && bHasTorch)
 		{
 			Inventory[0]->SetOwningPawn(this);
 			Inventory[0]->AttachMeshToPawn();
