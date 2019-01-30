@@ -19,21 +19,22 @@ public:
 	// Sets default values for this actor's properties
 	APickup();
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Capsule)
-	class USphereComponent* OverlapCapsule;
+
 
 	UPROPERTY(EditDefaultsOnly, Category = Mesh)
 	class UStaticMeshComponent* Mesh;
 
-	UFUNCTION()
-	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
 	UPROPERTY(EditDefaultsOnly, Category = Pickup)
 		int8 PickupValue;
 
+
+
+	void GiveWeaponToCharacter();
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	class ACharacter* MyCharacter;
 
 public:	
 	// Called every frame

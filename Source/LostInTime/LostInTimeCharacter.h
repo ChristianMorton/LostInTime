@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Public/PickupAndRotateActor/PickupAndRotateActor.h"
 #include "LostInTimeCharacter.generated.h"
 
 class ATorch;
@@ -13,7 +14,8 @@ enum class EWeaponType : uint8
 {
 	Torch,
 	Rifle,
-	Shotgun
+	Shotgun,
+	None
 };
 
 UCLASS(config=Game)
@@ -38,6 +40,8 @@ class ALostInTimeCharacter : public ACharacter
 
 	class ADefaultPickup* CurrentWeapon;
 
+	class APickup* WeaponPickup;
+
 
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -54,6 +58,8 @@ public:
 protected:
 	virtual void BeginPlay();
 
+	virtual void Tick(float DeltaSeconds) override;
+
 public:
 
 	/** Base turn rate, in deg/sec. Other scaling may affect final turn rate. */
@@ -68,6 +74,10 @@ public:
 
 	class USkeletalMeshComponent* GetFPMesh();
 
+	/** Holding Component */
+	UPROPERTY(EditAnywhere)
+		class USceneComponent* HoldingComponent;
+
 	UFUNCTION(BlueprintCallable, Category = "Pickup")
 	void SetPickup(int32 PickupValue);
 
@@ -76,7 +86,7 @@ protected:
 	/** Handles moving forward/backward */
 	void MoveForward(float Val);
 
-	/** Handles stafing movement, left and right */
+	/** Handles strafing movement, left and right */
 	void MoveRight(float Val);
 
 	/**
@@ -112,12 +122,45 @@ protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 	// End of APawn interface
 
+		/** Action Function */
+	void OnAction();
+
+	/** Inspect Function */
+	void OnInspect();
+	void OnInspectReleased();
+
+	void ToggleMovement();
+
+	void ToggleItemPickup();
+
 
 public:
 	/** Returns Mesh1P subobject **/
 	FORCEINLINE class USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
 	/** Returns FirstPersonCameraComponent subobject **/
 	FORCEINLINE class UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
+public:
+	UPROPERTY(EditAnywhere)
+		class APickupAndRotateActor* CurrentItem;
+
+	bool bCanMove;
+	bool bHoldingItem;
+	bool bInspecting;
+	float PitchMax;
+	float PitchMin;
+
+	FVector HoldingComp;
+	FRotator LastRotation;
+
+	FVector Start;
+	FVector ForwardVector;
+	FVector End;
+
+	FHitResult Hit;
+
+	FComponentQueryParams DefaultComponentQueryParams;
+	FCollisionResponseParams DefaultResponseParam;
 
 };
 

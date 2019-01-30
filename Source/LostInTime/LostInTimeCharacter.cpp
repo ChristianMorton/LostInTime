@@ -14,6 +14,8 @@
 #include "Components/SpotLightComponent.h"
 #include "Public/Pickups/Torch.h"
 #include "Public/Pickups/RifleWeapon.h"
+#include "Public/Pickups/Pickup.h"
+#include "DrawDebugHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 
@@ -24,6 +26,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 
 ALostInTimeCharacter::ALostInTimeCharacter()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
 
@@ -52,6 +56,15 @@ ALostInTimeCharacter::ALostInTimeCharacter()
 	bHasRifle = false;
 	bHasShotgun = false;
 
+	HoldingComponent = CreateDefaultSubobject<USceneComponent>(TEXT("HoldingComponent"));
+	HoldingComponent->RelativeLocation.X = 150.0f;
+	HoldingComponent->SetupAttachment(FirstPersonCameraComponent);
+
+	CurrentItem = NULL;
+	bCanMove = true;
+	bInspecting = false;
+	bHoldingItem = false;
+
 }
 
 void ALostInTimeCharacter::BeginPlay()
@@ -74,12 +87,72 @@ void ALostInTimeCharacter::BeginPlay()
 	// equip first weapon in inventory
 	if (Inventory.Num() > 0)
 	{
-		Inventory[1]->SetOwningPawn(this);
-		Inventory[1]->AttachMeshToPawn();
-		CurrentWeapon = Inventory[1];
-		ECurrentWeapon = EWeaponType::Rifle;
+		ECurrentWeapon = EWeaponType::None;
 	}
 
+	//Holding item get view pitch
+	PitchMax = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->ViewPitchMax;
+	PitchMin = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->ViewPitchMin;
+
+}
+
+void ALostInTimeCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	Start = FirstPersonCameraComponent->GetComponentLocation();
+	ForwardVector = FirstPersonCameraComponent->GetForwardVector();
+	End = ((ForwardVector * 300.f) + Start);
+
+	//DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1, 0, 1);
+
+	if (!bHoldingItem)
+	{
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, DefaultComponentQueryParams, DefaultResponseParam))
+		{
+			if (Hit.GetActor()->GetClass()->IsChildOf(APickup::StaticClass()))
+			{
+				WeaponPickup = Cast<APickup>(Hit.GetActor());
+			}
+			else if (Hit.GetActor()->GetClass()->IsChildOf(APickupAndRotateActor::StaticClass()))
+			{
+				
+				CurrentItem = Cast<APickupAndRotateActor>(Hit.GetActor());
+				
+				UE_LOG(LogTemp, Warning, TEXT("Got actor!"));
+			}
+		}
+		else
+		{
+			CurrentItem = NULL;
+			WeaponPickup = NULL;
+		}
+	}
+
+	if (bInspecting)
+	{
+		if (bHoldingItem)
+		{
+			FirstPersonCameraComponent->SetFieldOfView(FMath::Lerp(FirstPersonCameraComponent->FieldOfView, 90.0f, 0.1f));
+			HoldingComponent->SetRelativeLocation(FVector(50.0f, 0.0f, 0.0f));
+			GetWorld()->GetFirstPlayerController()->PlayerCameraManager->ViewPitchMax = 179.9000002f;
+			GetWorld()->GetFirstPlayerController()->PlayerCameraManager->ViewPitchMin = -179.9000002f;
+			CurrentItem->RotateActor();
+		}
+		else
+		{
+			FirstPersonCameraComponent->SetFieldOfView(FMath::Lerp(FirstPersonCameraComponent->FieldOfView, 45.0f, 0.1f));
+		}
+	}
+	else
+	{
+		FirstPersonCameraComponent->SetFieldOfView(FMath::Lerp(FirstPersonCameraComponent->FieldOfView, 90.0f, 0.1f));
+
+		if (bHoldingItem)
+		{
+			HoldingComponent->SetRelativeLocation(FVector(150.0f, 0.0f, 0.f));
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -107,6 +180,14 @@ void ALostInTimeCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	InputComponent->BindAction("Rifle_Equip", IE_Pressed, this, &ALostInTimeCharacter::SwapWeapon<EWeaponType::Rifle>);
 	//We tell the compiler that we pick the EWeaponType::Handgun explicitly
 	InputComponent->BindAction("Shotgun_Equip", IE_Pressed, this, &ALostInTimeCharacter::SwapWeapon<EWeaponType::Shotgun>);
+
+	// pickup
+	// Bind action event
+	PlayerInputComponent->BindAction("Action", IE_Pressed, this, &ALostInTimeCharacter::OnAction);
+
+	// Bind Inspect event
+	PlayerInputComponent->BindAction("Inspect", IE_Pressed, this, &ALostInTimeCharacter::OnInspect);
+	PlayerInputComponent->BindAction("Inspect", IE_Released, this, &ALostInTimeCharacter::OnInspectReleased);
 
 
 	// Bind movement events
@@ -143,14 +224,23 @@ void ALostInTimeCharacter::SetPickup(int32 PickupValue)
 		bHasTorch = true;
 		SwapWeapon(EWeaponType::Torch);
 		break;
+	case 1:
+		bHasRifle = true;
+		SwapWeapon(EWeaponType::Rifle);
+		break;
+	case 2:
+		bHasShotgun = true;
+		SwapWeapon(EWeaponType::Shotgun);
+		break;
 	default:
+		UE_LOG(LogTemp, Warning, TEXT("PickupValue out of range when calling SetPickup!"));
 		break;
 	}
 }
 
 void ALostInTimeCharacter::MoveForward(float Value)
 {
-	if (Value != 0.0f)
+	if (Value != 0.0f && bCanMove)
 	{
 		// add movement in that direction
 		AddMovementInput(GetActorForwardVector(), Value);
@@ -159,7 +249,7 @@ void ALostInTimeCharacter::MoveForward(float Value)
 
 void ALostInTimeCharacter::MoveRight(float Value)
 {
-	if (Value != 0.0f)
+	if (Value != 0.0f && bCanMove)
 	{
 		// add movement in that direction
 		AddMovementInput(GetActorRightVector(), Value);
@@ -198,7 +288,7 @@ void ALostInTimeCharacter::SwapWeapon(EWeaponType EWeaponToEquip)
 		}
 		break;
 	case EWeaponType::Rifle:
-		if (Inventory.Num() >= 2)
+		if (Inventory.Num() >= 2 && bHasRifle)
 		{
 			Inventory[1]->SetOwningPawn(this);
 			Inventory[1]->AttachMeshToPawn();
@@ -207,7 +297,7 @@ void ALostInTimeCharacter::SwapWeapon(EWeaponType EWeaponToEquip)
 		}
 		break;
 	case EWeaponType::Shotgun:
-		if (Inventory.Num() >= 3)
+		if (Inventory.Num() >= 3 && bHasShotgun)
 		{
 			Inventory[2]->SetOwningPawn(this);
 			Inventory[2]->AttachMeshToPawn();
@@ -232,5 +322,69 @@ void ALostInTimeCharacter::Reload()
 	if (CurrentWeapon && (ECurrentWeapon == EWeaponType::Rifle || ECurrentWeapon == EWeaponType::Shotgun))
 	{
 		CurrentWeapon->Reload();
+	}
+}
+
+void ALostInTimeCharacter::OnAction()
+{
+	if (WeaponPickup)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Should call GiveWeaponToCharacter"));
+		WeaponPickup->GiveWeaponToCharacter();
+	}
+
+	if (CurrentItem && !bInspecting)
+	{
+		ToggleItemPickup();
+	}
+}
+
+void ALostInTimeCharacter::OnInspect()
+{
+	if (bHoldingItem)
+	{
+		LastRotation = GetControlRotation();
+		ToggleMovement();
+	}
+	else
+	{
+		bInspecting = true;
+	}
+}
+
+void ALostInTimeCharacter::OnInspectReleased()
+{
+	if (bInspecting && bHoldingItem)
+	{
+		GetController()->SetControlRotation(LastRotation);
+		GetWorld()->GetFirstPlayerController()->PlayerCameraManager->ViewPitchMax = PitchMax;
+		GetWorld()->GetFirstPlayerController()->PlayerCameraManager->ViewPitchMin = PitchMin;
+		ToggleMovement();
+	}
+	else
+	{
+		bInspecting = false;
+	}
+}
+
+void ALostInTimeCharacter::ToggleMovement()
+{
+	bCanMove = !bCanMove;
+	bInspecting = !bInspecting;
+	FirstPersonCameraComponent->bUsePawnControlRotation = !FirstPersonCameraComponent->bUsePawnControlRotation;
+	bUseControllerRotationYaw = !bUseControllerRotationYaw;
+}
+
+void ALostInTimeCharacter::ToggleItemPickup()
+{
+	if (CurrentItem)
+	{
+		bHoldingItem = !bHoldingItem;
+		CurrentItem->Pickup();
+
+		if (!bHoldingItem)
+		{
+			CurrentItem = NULL;
+		}
 	}
 }

@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "LostInTimeCharacter.h"
 #include "LostInTime.h"
+#include "Kismet/GameplayStatics.h"
 
 
 
@@ -14,24 +15,34 @@ APickup::APickup()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	OverlapCapsule = CreateDefaultSubobject<USphereComponent>(TEXT("OverlapCapsule"));
-	OverlapCapsule->SetGenerateOverlapEvents(true);
-
-	OverlapCapsule->SetCollisionResponseToAllChannels(ECR_Block);
-
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	RootComponent = Mesh;
-
+	Mesh->SetSimulatePhysics(true);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	
 
 
+}
+
+void APickup::GiveWeaponToCharacter()
+{
+	ALostInTimeCharacter* tmp = Cast<ALostInTimeCharacter>(MyCharacter);
+	tmp->SetPickup(PickupValue);
+	if (tmp)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cast complete!"));
+	}
+	Destroy();
 }
 
 // Called when the game starts or when spawned
 void APickup::BeginPlay()
 {
 	Super::BeginPlay();
-	OverlapCapsule->OnComponentBeginOverlap.AddDynamic(this, &APickup::OnOverlapBegin);
+
+	MyCharacter = UGameplayStatics::GetPlayerCharacter(this, 0);
+	
+
 
 }
 
@@ -40,17 +51,5 @@ void APickup::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-}
-
-void APickup::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	TArray<AActor*> ActorSet;
-	OverlapCapsule->GetOverlappingActors(ActorSet, ALostInTimeCharacter::StaticClass());
-	for (int32 i = 0; i < ActorSet.Num(); i++)
-	{
-		ALostInTimeCharacter * temp = Cast<ALostInTimeCharacter>(ActorSet[i]);
-		temp->SetPickup(PickupValue);
-		Destroy();
-	}
 }
 
